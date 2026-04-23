@@ -1,0 +1,53 @@
+# ============================================================
+# DEPLOY TO AWS S3 - GitHub Actions Workflow
+# ============================================================
+# This workflow automatically uploads our static website
+# to an Amazon S3 bucket whenever we push code to main.
+# It uses OIDC (OpenID Connect) to securely authenticate
+# with AWS — no secret access keys needed!
+# ============================================================
+
+name: Deploy to S3
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+
+jobs:
+  deploy-to-s3:
+    name: Upload Website to S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS Credentials (Assume IAM Role via OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Verify AWS Identity
+        run: |
+          echo "✅ Successfully assumed IAM Role"
+          aws sts get-caller-identity
+
+      - name: Sync website files to S3
+        run: |
+          echo "🚀 Deploying to S3 bucket: $S3_BUCKET"
+          aws s3 sync . s3://$S3_BUCKET \
+            --delete \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "README.md" \
+            --exclude "LICENSE"
+          echo "✅ Deployment complete!"
